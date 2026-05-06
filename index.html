@@ -279,27 +279,27 @@ body{font-family:'Sora',sans-serif;background:var(--sand);color:var(--ink);min-h
       <div style="font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">En Pesos (ARS)</div>
       <div class="saldo-row">
         <div class="saldo-label">Efectivo caja</div>
-        <input type="text" class="saldo-input" id="sEfectivo" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sEfectivo" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Santander</div>
-        <input type="text" class="saldo-input" id="sSantander" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sSantander" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">BBVA</div>
-        <input type="text" class="saldo-input" id="sBbva" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sBbva" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Bco. Provincia</div>
-        <input type="text" class="saldo-input" id="sProvincia" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sProvincia" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Bco. Nación</div>
-        <input type="text" class="saldo-input" id="sNacion" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sNacion" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Otros ARS</div>
-        <input type="text" class="saldo-input" id="sOtros" placeholder="$0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sOtros" placeholder="$0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-total-row" style="margin-bottom:8px">
         <div class="saldo-total-label">TOTAL ARS</div>
@@ -308,15 +308,15 @@ body{font-family:'Sora',sans-serif;background:var(--sand);color:var(--ink);min-h
       <div style="font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;margin:10px 0 6px">En Dólares (USD)</div>
       <div class="saldo-row">
         <div class="saldo-label">Efectivo USD</div>
-        <input type="text" class="saldo-input" id="sEfectivoUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sEfectivoUSD" placeholder="u$s 0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Banco / billetera</div>
-        <input type="text" class="saldo-input" id="sBancoUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sBancoUSD" placeholder="u$s 0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-row">
         <div class="saldo-label">Otros USD</div>
-        <input type="text" class="saldo-input" id="sOtrosUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+        <input type="text" class="saldo-input" id="sOtrosUSD" placeholder="u$s 0" oninput="saveSaldosDebounced();calcProy()">
       </div>
       <div class="saldo-total-row" style="background:#1a6e3a;margin-top:4px">
         <div class="saldo-total-label">TOTAL USD</div>
@@ -787,20 +787,38 @@ function renderSaldos(){
   const arsKeys=[['efectivo','sEfectivo'],['santander','sSantander'],['bbva','sBbva'],
     ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros']];
   const usdKeys=[['efectivoUSD','sEfectivoUSD'],['bancoUSD','sBancoUSD'],['otrosUSD','sOtrosUSD']];
+  const activeId = document.activeElement?.id;
   [...arsKeys,...usdKeys].forEach(([k,id])=>{
     const el=document.getElementById(id);
-    if(el&&s[k]) el.value=parseAmt(s[k]).toLocaleString('es-AR');
+    if(!el) return;
+    // No sobreescribir el input que el usuario está editando ahora mismo
+    if(id === activeId) return;
+    if(s[k]) el.value=parseAmt(s[k]).toLocaleString('es-AR');
   });
   calcTotal();
 }
 function saveSaldos(){
-  const s={};
+  const s=loadSaldos(); // partir del estado actual
   [['efectivo','sEfectivo'],['santander','sSantander'],['bbva','sBbva'],
    ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros'],
    ['efectivoUSD','sEfectivoUSD'],['bancoUSD','sBancoUSD'],['otrosUSD','sOtrosUSD']
-  ].forEach(([k,id])=>{ s[k]=document.getElementById(id)?.value||'0'; });
-  saveSaldosData(s);
+  ].forEach(([k,id])=>{
+    const val = document.getElementById(id)?.value||'';
+    if(val !== '') s[k] = val; // solo actualizar si el campo tiene algo
+  });
+  // Guardar inmediatamente en localStorage (sin pasar por saveSaldosData para no triggerear API en cada keystroke)
+  localStorage.setItem(mkSaldos(), JSON.stringify(s));
   calcTotal();
+}
+
+function saveSaldosDebounced(){
+  saveSaldos();
+  // Sincronizar con API solo al terminar de escribir (debounce 1s)
+  clearTimeout(window._saldosTimer);
+  window._saldosTimer = setTimeout(()=>{
+    const s = loadSaldos();
+    apiWrite({ type:'saldos', key:mkSaldos(), value: JSON.stringify(s) });
+  }, 1000);
 }
 function calcTotal(){
   const s=loadSaldos();

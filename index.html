@@ -416,7 +416,10 @@ function jsonp(url){
 }
 
 async function apiGet(params){
-  if(!isApi()) return null;
+  if(!isApi()){
+    setSyncState('ok');
+    return null; // modo local — no llamar a ninguna API
+  }
   setSyncState('loading');
   try{
     const qs = new URLSearchParams(params).toString();
@@ -463,9 +466,11 @@ function saveNotasData(y,m,text){
 async function loadMonthFromApi(y,m){
   const data = await apiGet({ action:'getMonth', monthKey: mk(y,m) });
   if(!data || !data.entries) return;
-  // Sincronizar al localStorage local
-  Object.entries(data.entries).forEach(([key, value])=>{
-    localStorage.setItem(key, value);
+  // Solo sobreescribir keys que vengan con datos reales desde la API
+  const remoteKeys = Object.keys(data.entries);
+  if(remoteKeys.length === 0) return; // API vacía — no tocar local
+  remoteKeys.forEach(key=>{
+    localStorage.setItem(key, data.entries[key]);
   });
 }
 
@@ -477,10 +482,12 @@ function startPolling(){
   pollInterval = setInterval(async()=>{
     const data = await apiGet({ action:'getMonth', monthKey: mk(curYear,curMonth) });
     if(!data || !data.entries) return;
+    const remoteKeys = Object.keys(data.entries);
+    if(remoteKeys.length === 0) return; // no sobreescribir con vacío
     let changed = false;
-    Object.entries(data.entries).forEach(([key, value])=>{
-      if(localStorage.getItem(key) !== value){
-        localStorage.setItem(key, value);
+    remoteKeys.forEach(key=>{
+      if(localStorage.getItem(key) !== data.entries[key]){
+        localStorage.setItem(key, data.entries[key]);
         changed = true;
       }
     });

@@ -366,7 +366,7 @@ body{font-family:'Sora',sans-serif;background:var(--sand);color:var(--ink);min-h
 
 <script>
 // ══ CONFIG ══════════════════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbwSb18kMKLYi2UJw1V4rGsgeMmWK2WGfasTJ3lzunbh1clDeM3X4lRzoFN4s9C2Kux9/exec';
+const API_URL = 'TU_URL_DE_APPS_SCRIPT_AQUI';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS_LONG = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -386,7 +386,7 @@ function mkFlujo(y,m){ return `cp_flujo_${y}_${String(m+1).padStart(2,'0')}`; }
 function mkNotas(y,m){ return `cp_notas_${y}_${String(m+1).padStart(2,'0')}`; }
 
 // ══ LOAD/SAVE ════════════════════════════════════════════════
-function isApi(){ return API_URL && API_URL !== 'TU_URL_DE_APPS_SCRIPT_AQUI'; }
+function isApi(){ return API_URL && API_URL !== 'https://script.google.com/macros/s/AKfycbwSb18kMKLYi2UJw1V4rGsgeMmWK2WGfasTJ3lzunbh1clDeM3X4lRzoFN4s9C2Kux9/exec'; }
 
 function setSyncState(state){
   const dot = document.getElementById('syncDot');
@@ -791,9 +791,15 @@ function renderSaldos(){
   [...arsKeys,...usdKeys].forEach(([k,id])=>{
     const el=document.getElementById(id);
     if(!el) return;
-    // No sobreescribir el input que el usuario está editando ahora mismo
-    if(id === activeId) return;
-    if(s[k]) el.value=parseAmt(s[k]).toLocaleString('es-AR');
+    if(id === activeId) return; // no tocar el input activo
+    // Mostrar número puro — si está guardado (aunque sea 0) mostrarlo
+    // Si no existe en localStorage dejar placeholder vacío
+    if(s[k] !== undefined && s[k] !== '') {
+      const num = parseAmt(s[k]);
+      el.value = num > 0 ? String(num) : '';
+    } else {
+      el.value = '';
+    }
   });
   calcTotal();
 }
@@ -803,8 +809,9 @@ function saveSaldos(){
    ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros'],
    ['efectivoUSD','sEfectivoUSD'],['bancoUSD','sBancoUSD'],['otrosUSD','sOtrosUSD']
   ].forEach(([k,id])=>{
-    const val = document.getElementById(id)?.value||'';
-    if(val !== '') s[k] = val; // solo actualizar si el campo tiene algo
+    const raw = document.getElementById(id)?.value?.trim()||'';
+    // Guardar como número puro sin puntos de formato
+    s[k] = raw !== '' ? String(parseAmt(raw)) : '0';
   });
   // Guardar inmediatamente en localStorage (sin pasar por saveSaldosData para no triggerear API en cada keystroke)
   localStorage.setItem(mkSaldos(), JSON.stringify(s));

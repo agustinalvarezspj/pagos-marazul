@@ -276,6 +276,7 @@ body{font-family:'Sora',sans-serif;background:var(--sand);color:var(--ink);min-h
     <!-- SALDOS ACTUALES -->
     <div class="rp-section">
       <div class="rp-title">💵 Saldo disponible hoy</div>
+      <div style="font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">En Pesos (ARS)</div>
       <div class="saldo-row">
         <div class="saldo-label">Efectivo caja</div>
         <input type="text" class="saldo-input" id="sEfectivo" placeholder="$0" oninput="saveSaldos();calcProy()">
@@ -297,12 +298,29 @@ body{font-family:'Sora',sans-serif;background:var(--sand);color:var(--ink);min-h
         <input type="text" class="saldo-input" id="sNacion" placeholder="$0" oninput="saveSaldos();calcProy()">
       </div>
       <div class="saldo-row">
-        <div class="saldo-label">Otros</div>
+        <div class="saldo-label">Otros ARS</div>
         <input type="text" class="saldo-input" id="sOtros" placeholder="$0" oninput="saveSaldos();calcProy()">
       </div>
-      <div class="saldo-total-row">
-        <div class="saldo-total-label">TOTAL DISPONIBLE</div>
+      <div class="saldo-total-row" style="margin-bottom:8px">
+        <div class="saldo-total-label">TOTAL ARS</div>
         <div class="saldo-total-val" id="sTotal">$0</div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;margin:10px 0 6px">En Dólares (USD)</div>
+      <div class="saldo-row">
+        <div class="saldo-label">Efectivo USD</div>
+        <input type="text" class="saldo-input" id="sEfectivoUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+      </div>
+      <div class="saldo-row">
+        <div class="saldo-label">Banco / billetera</div>
+        <input type="text" class="saldo-input" id="sBancoUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+      </div>
+      <div class="saldo-row">
+        <div class="saldo-label">Otros USD</div>
+        <input type="text" class="saldo-input" id="sOtrosUSD" placeholder="u$s 0" oninput="saveSaldos();calcProy()">
+      </div>
+      <div class="saldo-total-row" style="background:#1a6e3a;margin-top:4px">
+        <div class="saldo-total-label">TOTAL USD</div>
+        <div class="saldo-total-val" id="sTotalUSD">u$s 0</div>
       </div>
     </div>
 
@@ -759,8 +777,11 @@ function closeMoOutside(e){ if(e.target===document.getElementById('moOverlay'))c
 // ══ SALDOS ═══════════════════════════════════════════════════
 function renderSaldos(){
   const s=loadSaldos();
-  ['efectivo','santander','bbva','provincia','nacion','otros'].forEach(k=>{
-    const el=document.getElementById('s'+k.charAt(0).toUpperCase()+k.slice(1));
+  const arsKeys=[['efectivo','sEfectivo'],['santander','sSantander'],['bbva','sBbva'],
+    ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros']];
+  const usdKeys=[['efectivoUSD','sEfectivoUSD'],['bancoUSD','sBancoUSD'],['otrosUSD','sOtrosUSD']];
+  [...arsKeys,...usdKeys].forEach(([k,id])=>{
+    const el=document.getElementById(id);
     if(el&&s[k]) el.value=parseAmt(s[k]).toLocaleString('es-AR');
   });
   calcTotal();
@@ -768,16 +789,19 @@ function renderSaldos(){
 function saveSaldos(){
   const s={};
   [['efectivo','sEfectivo'],['santander','sSantander'],['bbva','sBbva'],
-   ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros']].forEach(([k,id])=>{
-    s[k]=document.getElementById(id)?.value||'0';
-  });
+   ['provincia','sProvincia'],['nacion','sNacion'],['otros','sOtros'],
+   ['efectivoUSD','sEfectivoUSD'],['bancoUSD','sBancoUSD'],['otrosUSD','sOtrosUSD']
+  ].forEach(([k,id])=>{ s[k]=document.getElementById(id)?.value||'0'; });
   saveSaldosData(s);
   calcTotal();
 }
 function calcTotal(){
   const s=loadSaldos();
-  const total=['efectivo','santander','bbva','provincia','nacion','otros'].reduce((a,k)=>a+parseAmt(s[k]||0),0);
-  document.getElementById('sTotal').textContent=fmt(total);
+  const totalARS=['efectivo','santander','bbva','provincia','nacion','otros'].reduce((a,k)=>a+parseAmt(s[k]||0),0);
+  const totalUSD=['efectivoUSD','bancoUSD','otrosUSD'].reduce((a,k)=>a+parseAmt(s[k]||0),0);
+  document.getElementById('sTotal').textContent=fmt(totalARS);
+  const usdEl=document.getElementById('sTotalUSD');
+  if(usdEl) usdEl.textContent='u$s '+totalUSD.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
 // ══ FLUJO DE FONDOS ══════════════════════════════════════════
@@ -794,7 +818,7 @@ function renderFlujo(){
         <div class="flujo-fecha">${formatFlujoDate(f.fecha)}</div>
         <div class="flujo-concepto">${f.concepto}</div>
       </div>
-      <div class="flujo-monto ${f.tipo}">${fmt(parseAmt(f.monto))}</div>
+      <div class="flujo-monto ${f.tipo}">${fmtM(parseAmt(f.monto),f.moneda)}</div>
       <button class="flujo-del" onclick="delFlujo('${f.id}')">×</button>
     </div>`).join('');
 }
@@ -825,7 +849,14 @@ function openFlujoModal(tipo){
         </div>
         <div class="fg">
           <label class="fl">Importe *</label>
-          <input class="fi" id="flMonto" placeholder="$0">
+          <input class="fi" id="flMonto" placeholder="0">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Moneda</label>
+        <div style="display:flex;border-radius:6px;overflow:hidden;border:0.5px solid var(--sand3)">
+          <button id="flBtnARS" onclick="setFlujoCurrency('ARS')" style="flex:1;padding:7px;font-family:'Sora',sans-serif;font-size:11px;font-weight:700;border:none;cursor:pointer;background:#0D2B5E;color:white">$ARS</button>
+          <button id="flBtnUSD" onclick="setFlujoCurrency('USD')" style="flex:1;padding:7px;font-family:'Sora',sans-serif;font-size:11px;font-weight:700;border:none;cursor:pointer;background:var(--sand2);color:var(--muted)">u$s USD</button>
         </div>
       </div>
       <div class="fg">
@@ -841,6 +872,15 @@ function openFlujoModal(tipo){
   setTimeout(()=>document.getElementById('flConcepto')?.focus(),100);
 }
 
+let flujoCurrency = 'ARS';
+function setFlujoCurrency(c){
+  flujoCurrency=c;
+  const a=document.getElementById('flBtnARS');
+  const u=document.getElementById('flBtnUSD');
+  if(a){ a.style.background=c==='ARS'?'#0D2B5E':'var(--sand2)'; a.style.color=c==='ARS'?'white':'var(--muted)'; }
+  if(u){ u.style.background=c==='USD'?'#1a6e3a':'var(--sand2)'; u.style.color=c==='USD'?'white':'var(--muted)'; }
+}
+
 function saveFlujo(tipo){
   const concepto=document.getElementById('flConcepto')?.value.trim();
   const fecha=document.getElementById('flFecha')?.value;
@@ -848,14 +888,15 @@ function saveFlujo(tipo){
   const nota=document.getElementById('flNota')?.value.trim();
   if(!concepto||!monto){toast('Completá concepto e importe');return;}
 
-  // Determinar mes del flujo según fecha
   const [fy,fm]=fecha?fecha.split('-').map(Number):[curYear,curMonth+1];
   const flujos=loadFlujo(fy,fm-1);
-  flujos.push({id:uid(),tipo,concepto,fecha,monto,nota});
+  flujos.push({id:uid(),tipo,concepto,fecha,monto,moneda:flujoCurrency,nota});
   saveFlujoData(fy,fm-1,flujos);
+  flujoCurrency='ARS';
   closeFlujo();
   renderFlujo();
   calcProy();
+  calcMonthStats();
   toast(`${tipo==='cobro'?'Cobro':'Pago'} agregado al flujo`);
 }
 
@@ -894,12 +935,13 @@ function calcProy(){
 
     let movDia=0;
     items.forEach(item=>{
-      if(!item.done){
+      if(!item.done && item.moneda!=='USD'){
         if(item.tipo==='pago') movDia-=parseAmt(item.monto||0);
         if(item.tipo==='cobro') movDia+=parseAmt(item.monto||0);
       }
     });
     flujos.forEach(f=>{
+      if(f.moneda==='USD') return; // USD se excluye de proyección ARS
       if(f.tipo==='cobro') movDia+=parseAmt(f.monto||0);
       if(f.tipo==='egreso') movDia-=parseAmt(f.monto||0);
     });
@@ -932,21 +974,38 @@ function calcProy(){
 // ══ STATS DEL MES ════════════════════════════════════════════
 function calcMonthStats(){
   const lastDay=new Date(curYear,curMonth+1,0).getDate();
-  let totalPagos=0,pagados=0,pendientes=0,cobros=0;
+  let totalPagosARS=0,pagadosARS=0,pendientesARS=0,cobrosARS=0;
+  let totalPagosUSD=0,pagadosUSD=0,pendientesUSD=0,cobrosUSD=0;
   for(let d=1;d<=lastDay;d++){
     loadDay(curYear,curMonth,d).forEach(item=>{
       const amt=parseAmt(item.monto||0);
+      const isUSD=item.moneda==='USD';
       if(item.tipo==='pago'){
-        totalPagos+=amt;
-        if(item.done) pagados+=amt; else pendientes+=amt;
+        if(isUSD){ totalPagosUSD+=amt; if(item.done)pagadosUSD+=amt; else pendientesUSD+=amt; }
+        else { totalPagosARS+=amt; if(item.done)pagadosARS+=amt; else pendientesARS+=amt; }
       }
-      if(item.tipo==='cobro') cobros+=amt;
+      if(item.tipo==='cobro'){
+        if(isUSD) cobrosUSD+=amt; else cobrosARS+=amt;
+      }
+    });
+    // Sumar cobros del flujo de fondos de este mes
+    loadFlujo(curYear,curMonth).forEach(f=>{
+      const fd=parseInt((f.fecha||'').split('-')[2]||0);
+      if(fd===d && f.tipo==='cobro'){
+        const isUSD=f.moneda==='USD';
+        if(isUSD) cobrosUSD+=parseAmt(f.monto||0);
+        else cobrosARS+=parseAmt(f.monto||0);
+      }
     });
   }
-  document.getElementById('statPagos').textContent=fmt(totalPagos);
-  document.getElementById('statPagados').textContent=fmt(pagados);
-  document.getElementById('statPendientes').textContent=fmt(pendientes);
-  document.getElementById('statCobros').textContent=fmt(cobros);
+  const pagosLabel = totalPagosUSD>0 ? fmt(totalPagosARS)+' + u$s '+fmtM(totalPagosUSD,'USD').replace('u$s ','') : fmt(totalPagosARS);
+  const pagadosLabel = pagadosUSD>0 ? fmt(pagadosARS)+' + u$s '+fmtM(pagadosUSD,'USD').replace('u$s ','') : fmt(pagadosARS);
+  const pendLabel = pendientesUSD>0 ? fmt(pendientesARS)+' + u$s '+fmtM(pendientesUSD,'USD').replace('u$s ','') : fmt(pendientesARS);
+  const cobrosLabel = cobrosUSD>0 ? fmt(cobrosARS)+' + u$s '+fmtM(cobrosUSD,'USD').replace('u$s ','') : fmt(cobrosARS);
+  document.getElementById('statPagos').textContent=pagosLabel;
+  document.getElementById('statPagados').textContent=pagadosLabel;
+  document.getElementById('statPendientes').textContent=pendLabel;
+  document.getElementById('statCobros').textContent=cobrosLabel;
 }
 
 // ══ NOTAS ════════════════════════════════════════════════════
